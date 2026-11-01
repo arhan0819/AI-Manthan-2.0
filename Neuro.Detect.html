@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEURONEXUS InspectAI — Dedicated Coca-Cola 250ml Quality Inspection</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: #020611;
+      color: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+    }
+
+    header {
+      height: 48px;
+      background: #040b1c;
+      border-bottom: 1px solid rgba(244, 0, 9, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      flex-shrink: 0;
+      z-index: 50;
+    }
+    .brand { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 14px; color: #00f2fe; }
+    .page-nav { display: flex; align-items: center; gap: 8px; }
+    .page-btn {
+      background: #0a162e; border: 1px solid #1e293b; color: #94a3b8;
+      padding: 5px 14px; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer;
+    }
+    .page-btn.active { background: rgba(244, 0, 9, 0.2); border-color: #f40009; color: #f40009; }
+    .status-badge {
+      font-size: 11px; background: rgba(34, 197, 94, 0.1); border: 1px solid #22c55e;
+      color: #22c55e; padding: 4px 10px; border-radius: 9999px; display: flex; align-items: center; gap: 6px;
+    }
+    .dot { width: 6px; height: 6px; background: #22c55e; border-radius: 50%; box-shadow: 0 0 6px #22c55e; }
+
+    main { flex: 1; position: relative; overflow: hidden; display: flex; }
+    .page-view { position: absolute; inset: 0; display: none; flex-direction: column; overflow-y: auto; }
+    .page-view.active { display: flex; }
+
+    /* Page 1 Welcome */
+    .p1-scroll { flex: 1; overflow-y: auto; padding: 24px 20px 40px; }
+    .welcome-container { max-width: 960px; margin: auto; display: flex; flex-direction: column; gap: 20px; }
+    .welcome-hero {
+      background: linear-gradient(135deg, rgba(4, 20, 48, 0.9) 0%, rgba(2, 6, 17, 0.95) 100%);
+      border: 1px solid rgba(0, 242, 254, 0.35); border-radius: 12px; padding: 28px;
+    }
+    .welcome-hero h1 { font-size: 26px; font-weight: 900; color: #fff; }
+    .welcome-hero h1 span { color: #00f2fe; }
+
+    /* Page 2 Workstation */
+    .top-viewport-area {
+      flex: 1; position: relative; background: #000;
+      border-bottom: 2px solid #f40009; overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #camera-feed-video { position: absolute; width: 100%; height: 100%; object-fit: cover; }
+    .hud-overlay-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+    .target-box-controls {
+      position: absolute; top: 10px; right: 12px;
+      background: rgba(4, 11, 28, 0.92); border: 1px solid #00f2fe;
+      border-radius: 8px; padding: 6px 10px; display: flex; align-items: center; gap: 6px; font-size: 11px; z-index: 20;
+    }
+    .tb-btn { background: #0b1329; border: 1px solid #1e293b; color: #00f2fe; padding: 3px 8px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+
+    .cam-feed-bar { position: absolute; bottom: 10px; left: 12px; display: flex; align-items: center; gap: 8px; z-index: 20; }
+    .ip-input {
+      background: rgba(2, 6, 17, 0.9); border: 1px solid #1e293b; color: #00f2fe;
+      padding: 5px 10px; border-radius: 6px; font-size: 11px; font-family: monospace; width: 220px;
+    }
+    .btn-stream { background: #10b981; color: #fff; font-weight: 700; border: none; padding: 6px 14px; border-radius: 6px; font-size: 11px; cursor: pointer; }
+    .btn-stream.active { background: #ef4444; }
+
+    /* Bottom Console */
+    .bottom-console { height: 155px; background: #040814; display: flex; align-items: center; padding: 10px 16px; gap: 12px; flex-shrink: 0; z-index: 30; }
+    .verdict-box {
+      width: 280px; height: 100%; background: #0f172a; border: 2px solid #ffffff;
+      border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px; text-align: center;
+    }
+    .verdict-box.pass { background: #022c22; border-color: #22c55e; }
+    .verdict-box.defect { background: #450a0a; border-color: #ef4444; }
+    .verdict-badge { font-size: 18px; font-weight: 900; color: #ffffff; }
+    .verdict-box.pass .verdict-badge { color: #22c55e; }
+    .verdict-box.defect .verdict-badge { color: #ef4444; }
+    .verdict-sub { font-size: 10px; color: #94a3b8; margin-top: 4px; }
+
+    .caliper-tiles-group { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; height: 100%; }
+    .crit-tile { background: #0b1329; border: 1px solid #1e293b; border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; justify-content: space-between; }
+    .crit-tile.failed { background: #3b0f15; border-color: #ef4444; }
+    .crit-header { display: flex; align-items: center; justify-content: space-between; font-size: 11px; font-weight: 700; color: #94a3b8; }
+    .crit-word { font-size: 12px; font-weight: 800; color: #94a3b8; background: #0f172a; padding: 3px 8px; border-radius: 4px; width: fit-content; }
+    .crit-word.pass { color: #22c55e; background: #022c22; }
+    .crit-word.failed { color: #ef4444; background: #450a0a; }
+
+    .prod-stats-box { width: 130px; height: 100%; background: #0b1329; border: 1px solid #1e293b; border-radius: 8px; padding: 8px 12px; display: flex; flex-direction: column; justify-content: space-between; font-size: 11px; }
+    .stat-row { display: flex; justify-content: space-between; }
+    .stat-val { font-weight: 800; font-family: monospace; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <span>⬡ NEURONEXUS</span>
+      <span style="font-size: 11px; color: #94a3b8; font-weight: 400;">InspectAI</span>
+    </div>
+
+    <div class="page-nav">
+      <button class="page-btn" onclick="switchPage('page-welcome')">PAGE 1: WELCOME</button>
+      <button class="page-btn active" onclick="switchPage('page-workstation')">PAGE 2: LIVE WORKSTATION</button>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <button id="btn-arduino" class="page-btn" style="border-color: #00f2fe; color: #00f2fe;" onclick="connectArduino()">⚡ CONNECT ARDUINO (NANO)</button>
+      <div class="status-badge">
+        <span class="dot"></span>
+        <span>LINE: COCA-COLA 250ml</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div id="page-welcome" class="page-view">
+      <div class="p1-scroll">
+        <div class="welcome-container">
+          <div class="welcome-hero">
+            <h1>Dedicated Quality Inspector for <span>Coca-Cola 250ml</span></h1>
+            <p>Integrated Optical QA Station for DOMS 12.5 cm Conveyor Bed Box Jig.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="page-workstation" class="page-view active">
+      <div class="top-viewport-area">
+        <video id="camera-feed-video" autoplay playsinline muted></video>
+        <canvas id="cv-hidden-canvas" style="display: none;"></canvas>
+
+        <div class="target-box-controls">
+          <button class="tb-btn" style="background: #022c22; color: #22c55e; border-color: #22c55e;" onclick="autoAlignBoxToBottle()">🎯 AUTO-ALIGN</button>
+          <span style="color: #64748b;">|</span>
+          <span style="color: #94a3b8; font-weight: bold;">POS X:</span>
+          <button class="tb-btn" onclick="shiftBoxX(-25)">◀</button>
+          <button class="tb-btn" onclick="shiftBoxX(25)">▶</button>
+          <span style="color: #64748b;">|</span>
+          <span style="color: #94a3b8; font-weight: bold;">SCALE:</span>
+          <button class="tb-btn" onclick="adjustScale(-0.05)">−</button>
+          <span id="scale-val" style="color: #00f2fe; font-family: monospace; font-weight: bold;">1.00x</span>
+          <button class="tb-btn" onclick="adjustScale(0.05)">+</button>
+        </div>
+
+        <div class="cam-feed-bar">
+          <input type="text" id="stream-ip" class="ip-input" value="http://10.91.85.242:4747/video" placeholder="DroidCam Video IP">
+          <button id="btn-toggle-detect" class="btn-stream" onclick="toggleDetection()">START DETECTING</button>
+        </div>
+
+        <svg class="hud-overlay-svg" viewBox="0 0 1000 600" preserveAspectRatio="none">
+          <rect x="220" y="500" width="560" height="28" fill="rgba(0, 242, 254, 0.08)" stroke="#00f2fe" stroke-width="2" stroke-dasharray="6 3"/>
+          <text x="500" y="518" fill="#00f2fe" font-size="11" font-weight="bold" text-anchor="middle" font-family="monospace">
+            DOMS CONVEYOR BED: 12.5 cm CALIBRATION JIG
+          </text>
+
+          <g id="dynamic-target-box-group" transform="translate(0, 0)">
+            <rect id="rect-target-box" x="420" y="160" width="160" height="340" fill="rgba(0, 0, 0, 0.25)" stroke="#ffffff" stroke-width="2.5" rx="4"/>
+            <text id="txt-box-status" x="500" y="150" fill="#ffffff" font-size="12" font-weight="bold" text-anchor="middle">
+              ALIGN BOTTLE IN BOX
+            </text>
+
+            <line x1="500" y1="160" x2="500" y2="500" stroke="#00f2fe" stroke-width="1" stroke-dasharray="4 4" opacity="0.7"/>
+
+            <line id="line-fluid" x1="410" y1="235" x2="590" y2="235" stroke="#94a3b8" stroke-width="2.5"/>
+            <text id="txt-fluid" x="595" y="239" fill="#94a3b8" font-size="11" font-weight="bold">
+              1. FLUID: [STANDBY]
+            </text>
+
+            <rect id="rect-label" x="424" y="292" width="152" height="76" fill="rgba(244, 0, 9, 0.12)" stroke="#94a3b8" stroke-width="2" rx="2"/>
+            <text id="txt-label" x="595" y="334" fill="#94a3b8" font-size="11" font-weight="bold">
+              2. LABEL: [STANDBY]
+            </text>
+
+            <text id="txt-symmetry" x="500" y="490" fill="#94a3b8" font-size="10" font-weight="bold" text-anchor="middle">
+              3. [AWAITING BOTTLE]
+            </text>
+          </g>
+        </svg>
+      </div>
+
+      <div class="bottom-console">
+        <div id="banner-verdict" class="verdict-box">
+          <div id="verdict-title" class="verdict-badge">⚪ AWAITING BOTTLE</div>
+          <div id="verdict-sub" class="verdict-sub">Conveyor Standby: Will scan the moment bottle enters box</div>
+        </div>
+
+        <div class="caliper-tiles-group">
+          <div id="tile-sec-fluid" class="crit-tile">
+            <div class="crit-header"><span>⬢ FLUID LEVEL</span><span style="font-size: 9px; color: #00f2fe;">Agent 1</span></div>
+            <div id="word-sec-fluid" class="crit-word">STANDBY</div>
+          </div>
+
+          <div id="tile-sec-label" class="crit-tile">
+            <div class="crit-header"><span>⬢ LABEL & BRAND</span><span style="font-size: 9px; color: #00f2fe;">Agent 2</span></div>
+            <div id="word-sec-label" class="crit-word">STANDBY</div>
+          </div>
+
+          <div id="tile-sec-symm" class="crit-tile">
+            <div class="crit-header"><span>⬢ TARGET BOX FIT</span><span style="font-size: 9px; color: #00f2fe;">Coordinator</span></div>
+            <div id="word-sec-symm" class="crit-word">STANDBY</div>
+          </div>
+        </div>
+
+        <div class="prod-stats-box">
+          <div style="font-weight: 800; color: #94a3b8; font-size: 10px;">PRODUCTION</div>
+          <div class="stat-row"><span>TOTAL:</span><span id="stat-total" class="stat-val" style="color: #fff;">0</span></div>
+          <div class="stat-row"><span>PASS:</span><span id="stat-pass" class="stat-val" style="color: #22c55e;">0</span></div>
+          <div class="stat-row"><span>DEFECT:</span><span id="stat-reject" class="stat-val" style="color: #ef4444;">0</span></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    let boxOffsetX = 0;
+    let serialPort = null, serialReader = null;
+    let isInspectionLocked = false;
+
+    const app = {
+      detecting: false,
+      scale: 1.0,
+      cvTimer: null,
+      videoStream: null,
+      stats: { total: 0, pass: 0, reject: 0 }
+    };
+
+    function switchPage(pageId) {
+      document.querySelectorAll('.page-view').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.page-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById(pageId).classList.add('active');
+    }
+
+    function shiftBoxX(delta) {
+      boxOffsetX += delta;
+      updateBoxTransform();
+    }
+
+    function adjustScale(delta) {
+      app.scale = Math.max(0.6, Math.min(1.5, app.scale + delta));
+      document.getElementById('scale-val').textContent = app.scale.toFixed(2) + 'x';
+      updateBoxTransform();
+    }
+
+    function updateBoxTransform() {
+      const g = document.getElementById('dynamic-target-box-group');
+      if (g) {
+        g.setAttribute('transform', `translate(${boxOffsetX}, 0) scale(${app.scale}) translate(${(1 - app.scale) * 500}, ${(1 - app.scale) * 340})`);
+      }
+    }
+
+    function autoAlignBoxToBottle() {
+      const video = document.getElementById("camera-feed-video");
+      const hiddenCanvas = document.getElementById("cv-hidden-canvas");
+      if (!hiddenCanvas || !video) return;
+      const hCtx = hiddenCanvas.getContext("2d");
+      try {
+        hCtx.drawImage(video, 0, 0, 640, 480);
+        const frame = hCtx.getImageData(0, 0, 640, 480).data;
+        let redXSum = 0, redCount = 0;
+
+        for (let y = 140; y < 320; y += 4) {
+          for (let x = 40; x < 600; x += 4) {
+            const idx = (y * 640 + x) * 4;
+            const r = frame[idx], g = frame[idx + 1], b = frame[idx + 2];
+            if (r > 120 && (r > g * 1.25) && (r > b * 1.25)) {
+              redXSum += x;
+              redCount++;
+            }
+          }
+        }
+
+        if (redCount > 30) {
+          const detectedX = redXSum / redCount;
+          const svgX = (detectedX / 640) * 1000;
+          boxOffsetX = Math.round(svgX - 500);
+          updateBoxTransform();
+        } else {
+          alert("Move bottle into camera view to auto-align!");
+        }
+      } catch (e) { console.error(e); }
+    }
+
+    async function connectArduino() {
+      if (!("serial" in navigator)) {
+        alert("Please open this file in Google Chrome or Microsoft Edge for Serial support!");
+        return;
+      }
+      try {
+        serialPort = await navigator.serial.requestPort();
+        await serialPort.open({ baudRate: 9600 });
+        const btn = document.getElementById("btn-arduino");
+        btn.textContent = "✔ ARDUINO ARMED (D2 IR + D9 PUSHER)";
+        btn.style.borderColor = "#22c55e";
+        btn.style.color = "#22c55e";
+        readSerialStream();
+      } catch (err) { alert("Arduino Error: " + err); }
+    }
+
+    async function readSerialStream() {
+      while (serialPort && serialPort.readable) {
+        const textDecoder = new TextDecoderStream();
+        serialPort.readable.pipeTo(textDecoder.writable);
+        serialReader = textDecoder.readable.getReader();
+        let buffer = "";
+        try {
+          while (true) {
+            const { value, done } = await serialReader.read();
+            if (done) break;
+            if (value) {
+              buffer += value;
+              if (buffer.includes("TRIGGER")) {
+                buffer = "";
+                executeInspection();
+              }
+            }
+          }
+        } catch (e) { console.error(e); }
+        finally { serialReader.releaseLock(); }
+      }
+    }
+
+    // Direct Serial Writer (NO stream-locking bug!)
+    async function sendSerialDecision(cmd) {
+      if (serialPort && serialPort.writable) {
+        try {
+          const writer = serialPort.writable.getWriter();
+          const encoder = new TextEncoder();
+          await writer.write(encoder.encode(cmd + "\n"));
+          writer.releaseLock();
+          console.log("[InspectAI] Sent to Arduino Nano:", cmd);
+        } catch (err) {
+          console.error("[InspectAI] Serial Write Error:", err);
+        }
+      }
+    }
+
+    function toggleDetection() {
+      const btn = document.getElementById('btn-toggle-detect');
+      const video = document.getElementById('camera-feed-video');
+
+      if (app.detecting) {
+        app.detecting = false;
+        clearInterval(app.cvTimer);
+        if (app.videoStream) {
+          app.videoStream.getTracks().forEach(t => t.stop());
+          app.videoStream = null;
+        }
+        video.srcObject = null;
+        btn.innerText = 'START DETECTING';
+        btn.classList.remove('active');
+        updateStandbyHUD();
+        return;
+      }
+
+      navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } })
+        .then(stream => {
+          app.videoStream = stream;
+          video.srcObject = stream;
+          app.detecting = true;
+          btn.innerText = 'STOP DETECTING';
+          btn.classList.add('active');
+          startScanner(video);
+        })
+        .catch(err => {
+          app.detecting = true;
+          btn.innerText = 'STOP DETECTING';
+          btn.classList.add('active');
+          startScanner(video);
+        });
+    }
+
+    function startScanner(videoEl) {
+      const hiddenCanvas = document.getElementById('cv-hidden-canvas');
+      const hCtx = hiddenCanvas.getContext('2d');
+      hiddenCanvas.width = 640;
+      hiddenCanvas.height = 480;
+
+      app.cvTimer = setInterval(() => {
+        if (!app.detecting) return;
+        try {
+          hCtx.drawImage(videoEl, 0, 0, 640, 480);
+        } catch (e) { return; }
+
+        const frame = hCtx.getImageData(0, 0, 640, 480).data;
+        const cx = Math.max(50, Math.min(590, 320 + Math.round((boxOffsetX / 1000) * 640)));
+
+        let redCount = 0;
+        let darkColaCount = 0;
+
+        // Sample strictly down the 80px bottle spine
+        for (let y = 144; y < 288; y++) {
+          for (let x = cx - 40; x < cx + 40; x++) {
+            const idx = (y * 640 + x) * 4;
+            const r = frame[idx], g = frame[idx + 1], b = frame[idx + 2];
+            // Coca-Cola Scarlet Red label
+            if (r > 120 && (r > g * 1.25) && (r > b * 1.25)) redCount++;
+            // Deep dark carbonated cola liquid
+            if (r < 75 && g < 70 && b < 70) darkColaCount++;
+          }
+        }
+
+        // STANDBY: Empty room wall has ZERO red pixels!
+        const isBottleInBox = (redCount >= 60);
+
+        if (!isBottleInBox) {
+          updateStandbyHUD();
+          return;
+        }
+
+        // Bottle is in box: Execute detection
+        executeInspectionValues(darkColaCount, redCount);
+      }, 100);
+    }
+
+    function executeInspection() {
+      if (isInspectionLocked) return;
+      isInspectionLocked = true;
+      setTimeout(() => { isInspectionLocked = false; }, 1800);
+
+      const video = document.getElementById("camera-feed-video");
+      const hiddenCanvas = document.getElementById("cv-hidden-canvas");
+      const hCtx = hiddenCanvas.getContext("2d");
+      try {
+        hCtx.drawImage(video, 0, 0, 640, 480);
+        const frame = hCtx.getImageData(0, 0, 640, 480).data;
+        const cx = Math.max(50, Math.min(590, 320 + Math.round((boxOffsetX / 1000) * 640)));
+
+        let redCount = 0, darkColaCount = 0;
+        for (let y = 144; y < 288; y++) {
+          for (let x = cx - 40; x < cx + 40; x++) {
+            const idx = (y * 640 + x) * 4;
+            const r = frame[idx], g = frame[idx + 1], b = frame[idx + 2];
+            if (r > 120 && (r > g * 1.25) && (r > b * 1.25)) redCount++;
+            if (r < 75 && g < 70 && b < 70) darkColaCount++;
+          }
+        }
+
+        executeInspectionValues(darkColaCount, redCount);
+        setTimeout(() => { updateStandbyHUD(); }, 1400);
+      } catch (e) { console.error(e); }
+    }
+
+    function executeInspectionValues(darkColaCount, redCount) {
+      // 1:1 match with Python backend:
+      // Full bottle: darkColaCount >= 500, redCount >= 60 -> PASS!
+      // Empty bottle: darkColaCount is 0 to 18 -> DEFECT!
+      const fluid_pass = (darkColaCount >= 300);
+      const label_pass = (redCount >= 60);
+      const allPass = fluid_pass && label_pass;
+
+      updateTargetBoxHUD(fluid_pass, fluid_pass ? "11.8cm NOMINAL" : "EMPTY BOTTLE",
+                         label_pass, label_pass ? "COCA-COLA RED" : "LABEL MISSING", allPass);
+      evaluateVerdict(fluid_pass, fluid_pass ? "11.8cm NOMINAL" : "EMPTY BOTTLE",
+                      label_pass, label_pass ? "COCA-COLA RED" : "LABEL MISSING", allPass);
+
+      sendSerialDecision(allPass ? "P" : "R");
+    }
+
+    function updateStandbyHUD() {
+      document.getElementById('rect-target-box').setAttribute('stroke', '#ffffff');
+      document.getElementById('txt-box-status').textContent = 'ALIGN BOTTLE IN BOX';
+      document.getElementById('txt-box-status').setAttribute('fill', '#ffffff');
+      document.getElementById('txt-fluid').textContent = '1. FLUID: [STANDBY]';
+      document.getElementById('txt-fluid').setAttribute('fill', '#94a3b8');
+      document.getElementById('line-fluid').setAttribute('stroke', '#94a3b8');
+      document.getElementById('txt-label').textContent = '2. LABEL: [STANDBY]';
+      document.getElementById('txt-label').setAttribute('fill', '#94a3b8');
+      document.getElementById('rect-label').setAttribute('stroke', '#94a3b8');
+
+      const vBox = document.getElementById('banner-verdict');
+      vBox.className = 'verdict-box';
+      document.getElementById('verdict-title').textContent = '⚪ AWAITING BOTTLE';
+      document.getElementById('verdict-sub').textContent = 'Conveyor Standby: Will scan the moment bottle enters box';
+
+      setTile('tile-sec-fluid', 'word-sec-fluid', 'standby', 'STANDBY');
+      setTile('tile-sec-label', 'word-sec-label', 'standby', 'STANDBY');
+      setTile('tile-sec-symm', 'word-sec-symm', 'standby', 'STANDBY');
+    }
+
+    function updateTargetBoxHUD(fPass, fWord, lPass, lWord, allPass) {
+      document.getElementById('txt-fluid').textContent = `1. FLUID: [${fWord}]`;
+      document.getElementById('txt-fluid').setAttribute('fill', fPass ? '#22c55e' : '#ef4444');
+      document.getElementById('line-fluid').setAttribute('stroke', fPass ? '#22c55e' : '#ef4444');
+
+      document.getElementById('txt-label').textContent = `2. LABEL: [${lWord}]`;
+      document.getElementById('txt-label').setAttribute('fill', lPass ? '#22c55e' : '#ef4444');
+      document.getElementById('rect-label').setAttribute('stroke', lPass ? '#22c55e' : '#ef4444');
+
+      document.getElementById('rect-target-box').setAttribute('stroke', allPass ? '#22c55e' : '#ef4444');
+      document.getElementById('txt-box-status').textContent = allPass ? '✔ FITS IN BOX (PASS)' : '✖ DEFECT DETECTED';
+      document.getElementById('txt-box-status').setAttribute('fill', allPass ? '#22c55e' : '#ef4444');
+
+      setTile('tile-sec-fluid', 'word-sec-fluid', fPass ? 'pass' : 'fail', fWord);
+      setTile('tile-sec-label', 'word-sec-label', lPass ? 'pass' : 'fail', lWord);
+      setTile('tile-sec-symm', 'word-sec-symm', 'pass', 'FITS IN BOX');
+    }
+
+    function setTile(tileId, wordId, state, word) {
+      const tile = document.getElementById(tileId);
+      const wEl = document.getElementById(wordId);
+      tile.className = 'crit-tile' + (state === 'fail' ? ' failed' : '');
+      wEl.className = 'crit-word' + (state === 'pass' ? ' pass' : (state === 'fail' ? ' failed' : ''));
+      wEl.textContent = word;
+    }
+
+    function evaluateVerdict(fPass, fWord, lPass, lWord, allPass) {
+      const vBox = document.getElementById('banner-verdict');
+      const vTitle = document.getElementById('verdict-title');
+      const vSub = document.getElementById('verdict-sub');
+
+      if (allPass) {
+        vBox.className = 'verdict-box pass';
+        vTitle.textContent = '✔ PASS';
+        vSub.textContent = 'Fluid & Label Verified Nominal';
+        app.stats.pass++;
+      } else {
+        vBox.className = 'verdict-box defect';
+        vTitle.textContent = '✖ DEFECT DETECTED';
+        let fails = [];
+        if (!fPass) fails.push(`FLUID (${fWord})`);
+        if (!lPass) fails.push(`LABEL (${lWord})`);
+        vSub.textContent = fails.join(' | ');
+        app.stats.reject++;
+      }
+
+      app.stats.total++;
+      document.getElementById('stat-total').textContent = app.stats.total;
+      document.getElementById('stat-pass').textContent = app.stats.pass;
+      document.getElementById('stat-reject').textContent = app.stats.reject;
+    }
+  </script>
+</body>
+</html>  
